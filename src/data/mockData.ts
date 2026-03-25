@@ -6,6 +6,7 @@ export interface Message {
   text: string;
   time: string;
   type: "text" | "image" | "poll";
+  pollId?: string;
   reactions?: { emoji: string; count: number }[];
 }
 

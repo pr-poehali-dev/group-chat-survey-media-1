@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { chats, currentUser, type Chat, type Member, type Message } from "@/data/mockData";
+import { chats, polls as allPolls, currentUser, type Chat, type Member, type Message, type Poll } from "@/data/mockData";
 import Icon from "@/components/ui/icon";
 
-type ModalType = "members" | "addMember" | null;
+type ModalType = "members" | "addMember" | "attachPoll" | null;
 
 export default function ChatsPage() {
   const [selectedChat, setSelectedChat] = useState<Chat | null>(chats[0]);
@@ -11,6 +11,7 @@ export default function ChatsPage() {
   const [modal, setModal] = useState<ModalType>(null);
   const [search, setSearch] = useState("");
   const [showSidebar, setShowSidebar] = useState(false);
+  const [chatPolls, setChatPolls] = useState<Poll[]>(allPolls);
 
   const filteredChats = chats.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase())
@@ -35,6 +36,42 @@ export default function ChatsPage() {
     };
     setMessages((prev) => [...prev, newMsg]);
     setInputText("");
+  };
+
+  const sendPoll = (poll: Poll) => {
+    if (!selectedChat) return;
+    const newMsg: Message = {
+      id: `m_${Date.now()}`,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      avatar: currentUser.avatar,
+      text: "",
+      time: new Date().toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" }),
+      type: "poll",
+      pollId: poll.id,
+    };
+    setMessages((prev) => [...prev, newMsg]);
+    setModal(null);
+  };
+
+  const voteInChat = (pollId: string, optionId: string) => {
+    setChatPolls((prev) =>
+      prev.map((poll) => {
+        if (poll.id !== pollId) return poll;
+        if (poll.userVoted?.includes(optionId)) return poll;
+        const newVoted = poll.multipleChoice
+          ? [...(poll.userVoted ?? []), optionId]
+          : [optionId];
+        return {
+          ...poll,
+          userVoted: newVoted,
+          totalVotes: (poll.userVoted?.length ?? 0) === 0 ? poll.totalVotes + 1 : poll.totalVotes,
+          options: poll.options.map((o) =>
+            o.id === optionId ? { ...o, votes: o.votes + 1 } : o
+          ),
+        };
+      })
+    );
   };
 
   const roleLabel = (role: Member["role"]) => {
@@ -137,6 +174,67 @@ export default function ChatsPage() {
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {messages.map((msg) => {
               const isOwn = msg.userId === currentUser.id;
+
+              if (msg.type === "poll" && msg.pollId) {
+                const poll = chatPolls.find((p) => p.id === msg.pollId);
+                if (!poll) return null;
+                const maxVotes = Math.max(...poll.options.map((o) => o.votes), 1);
+                const hasVoted = (poll.userVoted?.length ?? 0) > 0;
+                return (
+                  <div key={msg.id} className="flex gap-3 animate-fade-in">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white shrink-0 mt-1">
+                      {msg.avatar}
+                    </div>
+                    <div className="max-w-sm flex flex-col gap-1">
+                      <span className="text-xs text-muted-foreground px-1">{msg.userName}</span>
+                      <div className="glass rounded-2xl rounded-tl-sm p-4 space-y-3 border border-purple-500/20 message-bubble-in">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center">
+                            <Icon name="BarChart3" size={12} className="text-white" />
+                          </div>
+                          <span className="text-xs text-purple-400 font-medium">Опрос</span>
+                          {poll.anonymous && <span className="text-xs text-muted-foreground">· Анонимный</span>}
+                        </div>
+                        <p className="text-sm font-medium text-white leading-snug">{poll.question}</p>
+                        <div className="space-y-2">
+                          {poll.options.map((option) => {
+                            const percent = poll.totalVotes > 0 ? Math.round((option.votes / poll.totalVotes) * 100) : 0;
+                            const isVoted = poll.userVoted?.includes(option.id);
+                            const isLeading = option.votes === maxVotes && option.votes > 0;
+                            return (
+                              <button
+                                key={option.id}
+                                onClick={() => !hasVoted && voteInChat(poll.id, option.id)}
+                                disabled={hasVoted && !poll.multipleChoice}
+                                className="w-full text-left"
+                              >
+                                <div className="flex items-center justify-between mb-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition-all ${isVoted ? "border-purple-400 bg-purple-500" : "border-white/20"}`}>
+                                      {isVoted && <div className="w-1 h-1 rounded-full bg-white" />}
+                                    </div>
+                                    <span className={`text-xs ${isVoted ? "text-white font-medium" : "text-muted-foreground"}`}>{option.text}</span>
+                                    {isLeading && hasVoted && <Icon name="TrendingUp" size={10} className="text-cyan-400" />}
+                                  </div>
+                                  {hasVoted && <span className="text-xs text-muted-foreground">{percent}%</span>}
+                                </div>
+                                <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full transition-all duration-700 ${isVoted ? "bg-gradient-to-r from-purple-500 to-cyan-400" : "bg-white/15"}`}
+                                    style={{ width: hasVoted ? `${percent}%` : "0%" }}
+                                  />
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{poll.totalVotes} голосов · {msg.time}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <div key={msg.id} className={`flex gap-3 animate-fade-in ${isOwn ? "flex-row-reverse" : ""}`}>
                   {!isOwn && (
@@ -174,8 +272,12 @@ export default function ChatsPage() {
           {/* Input */}
           <div className="p-4 glass border-t border-white/8 shrink-0">
             <div className="flex gap-2 items-end">
-              <button className="w-10 h-10 shrink-0 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all">
-                <Icon name="Paperclip" size={18} className="text-muted-foreground" />
+              <button
+                onClick={() => setModal("attachPoll")}
+                className="w-10 h-10 shrink-0 rounded-xl bg-white/5 hover:bg-purple-500/20 hover:border hover:border-purple-500/30 flex items-center justify-center transition-all group"
+                title="Прикрепить опрос"
+              >
+                <Icon name="BarChart3" size={18} className="text-muted-foreground group-hover:text-purple-400 transition-colors" />
               </button>
               <div className="flex-1 relative">
                 <input
@@ -312,6 +414,63 @@ export default function ChatsPage() {
               >
                 Добавить в чат
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Attach Poll Modal */}
+      {modal === "attachPoll" && selectedChat && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="glass-strong rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col animate-scale-in border border-white/12">
+            <div className="flex items-center justify-between p-5 border-b border-white/8">
+              <div>
+                <h3 className="font-display font-bold text-white">Прикрепить опрос</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Выберите опрос для отправки в чат</p>
+              </div>
+              <button onClick={() => setModal(null)} className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center">
+                <Icon name="X" size={16} className="text-muted-foreground" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {chatPolls.length === 0 && (
+                <div className="text-center py-10 text-muted-foreground text-sm">Нет доступных опросов</div>
+              )}
+              {chatPolls.map((poll) => (
+                <button
+                  key={poll.id}
+                  onClick={() => sendPoll(poll)}
+                  className="w-full text-left p-4 glass rounded-xl hover:border-purple-500/30 transition-all group"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center shrink-0">
+                      <Icon name="BarChart3" size={16} className="text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white group-hover:text-purple-300 transition-colors leading-snug">{poll.question}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-muted-foreground">{poll.options.length} варианта · {poll.totalVotes} голосов</span>
+                        {poll.anonymous && (
+                          <span className="text-xs text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                            <Icon name="EyeOff" size={9} /> Анонимный
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {poll.options.slice(0, 3).map((o) => (
+                          <span key={o.id} className="text-xs bg-white/5 text-muted-foreground px-2 py-0.5 rounded-full truncate max-w-24">
+                            {o.text}
+                          </span>
+                        ))}
+                        {poll.options.length > 3 && (
+                          <span className="text-xs text-muted-foreground">+{poll.options.length - 3}</span>
+                        )}
+                      </div>
+                    </div>
+                    <Icon name="Send" size={15} className="text-muted-foreground group-hover:text-purple-400 transition-colors shrink-0 mt-1" />
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
         </div>
