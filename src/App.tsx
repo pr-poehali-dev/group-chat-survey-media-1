@@ -10,6 +10,7 @@ import GalleryPage from "./pages/GalleryPage";
 import ProfilePage from "./pages/ProfilePage";
 import NotificationsPage from "./pages/NotificationsPage";
 import SettingsPage from "./pages/SettingsPage";
+import PwaInstallBanner from "./components/PwaInstallBanner";
 
 const queryClient = new QueryClient();
 
@@ -18,6 +19,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <PwaInstallBanner />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Layout />}>

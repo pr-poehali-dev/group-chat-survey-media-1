@@ -1,0 +1,26 @@
+{
+  "name": "Вектор — групповой чат",
+  "short_name": "Вектор",
+  "description": "Групповой чат с опросами и медиа",
+  "theme_color": "#0f0f13",
+  "background_color": "#0f0f13",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "start_url": "/",
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
